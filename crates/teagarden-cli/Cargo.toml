@@ -1,0 +1,89 @@
+[package]
+name = "teagarden-cli"
+description = "Encrypted filesystem backed by Telegram cloud storage"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "../../README.md"
+
+[[bin]]
+name = "teagarden"
+path = "src/main.rs"
+
+# ---------------------------------------------------------------------------
+# Feature flags
+#
+# The core of TeaGarden (volume create/mount via FUSE, key management, auth,
+# sharing, key slots) is ALWAYS compiled. `dev` adds the teagarden-dev encrypted
+# block device and its NBD export; it is on by default (via `full`).
+#
+#   cargo build                               # core + dev
+#   cargo build --no-default-features         # core CLI only
+# ---------------------------------------------------------------------------
+[features]
+# Experimental portable root rotation and key handoffs; excluded from 1.0 defaults.
+key-rotation = ["teagarden-core/key-rotation", "teagarden-fuse/key-rotation", "teagarden-mfa/key-rotation"]
+default = ["full"]
+# Everything supported in 1.0 — the out-of-the-box build.
+full = ["dev"]
+# teagarden-dev: the encrypted block-device engine + its NBD export.
+dev = ["dep:teagarden-dev", "dep:teagarden-nbd"]
+
+[dependencies]
+teagarden-core = { workspace = true }
+ed25519-dalek = { workspace = true }
+teagarden-store = { workspace = true }
+teagarden-telegram = { workspace = true }
+teagarden-cache = { workspace = true }
+teagarden-fuse = { workspace = true }
+teagarden-sharing = { workspace = true }
+teagarden-api = { workspace = true }
+teagarden-mfa = { workspace = true }
+# --- Optional (feature-gated; see [features] above) -------------------------
+teagarden-dev = { workspace = true, optional = true }
+teagarden-nbd = { workspace = true, optional = true }
+tokio = { workspace = true }
+clap = { workspace = true }
+clap_complete = { workspace = true }
+clap_mangen = { workspace = true }
+toml = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+dirs = { workspace = true }
+rusqlite = { workspace = true }
+blake3 = { workspace = true }
+hex = { workspace = true }
+libc = { workspace = true }
+zeroize = { workspace = true }
+base64ct = { workspace = true }
+qrcode = { version = "0.14", default-features = false }
+rand = { workspace = true }
+fuser = { workspace = true }
+rpassword = { workspace = true }
+uuid = { workspace = true }
+tempfile = { workspace = true }
+
+[dev-dependencies]
+teagarden-mfa = { workspace = true, features = ["test-util"] }
+assert_cmd = { workspace = true }
+predicates = { workspace = true }
+teagarden-telegram = { workspace = true, features = ["test-util"] }
+
+# macOS/BSD: fuser's pure-Rust mount is Linux-only (its build.rs panics otherwise);
+# enable the `libfuse` feature so it links libfuse / macFUSE via pkg-config.
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+fuser = { workspace = true, features = ["libfuse"] }
+
+# docs.rs: all shipped factors are hermetic at build time and are always part of
+# the CLI core. FIDO2 delegates to its external plugin only at factor use.
+[package.metadata.docs.rs]
+no-default-features = true
+features = ["dev"]

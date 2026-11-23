@@ -1,0 +1,12 @@
+#!/bin/sh
+# umount.fuse.teagarden — umount(8) helper for TeaGarden mounts (fstype
+# `fuse.teagarden`, set via the Subtype mount option). Graceful: `TeaGarden volume
+# unmount` waits for the in-flight upload queue to DRAIN before the mount detaches,
+# so a large file finishes uploading to Telegram instead of being lost. Invoked
+# automatically by `umount <dir>` / `umount -a`.
+#
+# Install: sudo install -m 755 scripts/umount.fuse.teagarden /sbin/umount.fuse.teagarden
+set -u
+TeaGarden="${TEAGARDEN_BIN:-teagarden}"
+dir="${1:?usage: umount.fuse.teagarden <mountpoint>}"
+exec "$TeaGarden" volume unmount "$dir"

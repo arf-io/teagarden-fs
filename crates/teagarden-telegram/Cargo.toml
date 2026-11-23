@@ -1,0 +1,43 @@
+[package]
+name = "teagarden-telegram"
+description = "Telegram API backend for block upload/download and group management"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "../../README.md"
+
+[features]
+# In-memory MockTransport test double. OFF by default so no product build can
+# link it; dependents enable it only from [dev-dependencies].
+test-util = []
+
+[dependencies]
+grammers-client = { workspace = true }
+grammers-crypto = "0.10"
+grammers-session = { workspace = true }
+rusqlite = { workspace = true }
+# Raw requests must use the exact Telegram schema layer selected by the client.
+grammers-tl-types = "0.10"
+grammers-mtsender = "0.10"
+tokio = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+rand = { workspace = true }
+# Block-upload part checksum for the small-file path (mirrors grammers' own upload).
+md5 = "0.7"
+futures = { workspace = true }
+# Bot HTTP API transport (parallel uploads via api.telegram.org); needs multipart
+# for sendDocument and json for response parsing.
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "multipart"] }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["test-util"] }

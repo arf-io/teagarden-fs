@@ -1,0 +1,176 @@
+#!/usr/bin/env bash
+# teagarden-dev-attach — attach a TeaGarden encrypted block device to a stable
+# /dev path so other tools (mkfs, mount, fstab, LVM, fio, …) can use it like any
+# other disk.
+#
+# WHAT THIS GIVES YOU
+#
+#   /dev/teagarden-dev/<name>  ->  /dev/nbdN
+#
+# NBD hands out /dev/nbd0, /dev/nbd1, … in whatever order things attach, so the
+# number is not stable across reboots and must never be written into /etc/fstab.
+# This creates a stable, name-based symlink that is.
+#
+#   teagarden-dev-attach vault              # attach; prints the device path
+#   teagarden-dev-attach --detach vault     # unwind cleanly
+#
+# Then use it as an ordinary block device:
+#
+#   sudo mkfs.ext4 /dev/teagarden-dev/vault      # the GUEST filesystem
+#   sudo mount /dev/teagarden-dev/vault /mnt/vault
+#
+# REQUIREMENTS
+#   - root (nbd-client and /dev nodes need it)
+#   - the `nbd` kernel module  (sudo modprobe nbd)
+#   - nbd-client               (Debian/Ubuntu: nbd-client, Arch: nbd)
+#   - a device already created with `teagarden dev create`
+#
+# CREDENTIAL
+#   Required — there is no fallback key. Supply it with TEAGARDEN_DEV_PASSWORD or
+#   --password-file. A boot-time attach cannot prompt, so use --password-file
+#   with a 0600 file for anything unattended.
+#
+# NOTE ON TIMING: key derivation is Argon2id at 256 MiB. With a release build
+# that is a couple of seconds; with a debug build it looks like a hang. Use the
+# released binary.
+
+set -euo pipefail
+
+TeaGarden="${TEAGARDEN_BIN:-teagarden}"
+LINKDIR="/dev/teagarden-dev"
+RUNDIR="/run/teagarden-dev"
+BIND_HOST="127.0.0.1"
+
+die() { echo "teagarden-dev-attach: $*" >&2; exit 1; }
+
+detach=0
+password_file=""
+name=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --detach|-d) detach=1; shift ;;
+        --password-file) password_file="$2"; shift 2 ;;
+        --password-file=*) password_file="${1#*=}"; shift ;;
+        -h|--help) sed -n '2,40p' "$0"; exit 0 ;;
+        -*) die "unknown option: $1" ;;
+        *) name="$1"; shift ;;
+    esac
+done
+[ -n "$name" ] || die "usage: teagarden-dev-attach [--detach] [--password-file PATH] <name>"
+[ "$(id -u)" -eq 0 ] || die "must run as root (nbd-client and /dev nodes require it)"
+
+mkdir -p "$RUNDIR" "$LINKDIR"
+link="$LINKDIR/$name"
+pidfile="$RUNDIR/$name.pid"
+devfile="$RUNDIR/$name.dev"
+
+# ── detach ────────────────────────────────────────────────────────────────────
+if [ "$detach" -eq 1 ]; then
+    if [ -r "$devfile" ]; then
+        dev="$(cat "$devfile")"
+        # Refuse to yank a device out from under a mounted filesystem: that
+        # corrupts the guest fs and can lose writes still in its page cache.
+        if findmnt -S "$dev" >/dev/null 2>&1; then
+            die "$dev is still mounted — umount it first (unmounting flushes the guest filesystem)"
+        fi
+        nbd-client -d "$dev" >/dev/null 2>&1 || true
+        echo "detached $dev"
+    fi
+    status=0
+    if [ -r "$pidfile" ]; then
+        pid="$(cat "$pidfile")"
+        # `nbd-client -d` above already makes `dev serve nbd` finalize: upload the
+        # open segment (up to one segment, 45 MiB by default) and publish a final
+        # checkpoint, then exit. SIGINT covers a server that did not see the
+        # disconnect. Never KILL: wait for it (up to TEAGARDEN_DEV_STOP_TIMEOUT
+        # seconds, default 840, inside the unit's TimeoutStopSec).
+        kill -INT "$pid" 2>/dev/null || true
+        waited=0
+        while kill -0 "$pid" 2>/dev/null; do
+            if [ "$waited" -ge "${TEAGARDEN_DEV_STOP_TIMEOUT:-840}" ]; then
+                echo "teagarden-dev-attach: dev serve nbd ($pid) is still finalizing after ${waited}s; not killing it" >&2
+                status=1
+                break
+            fi
+            sleep 1
+            waited=$((waited + 1))
+        done
+        logfile="$RUNDIR/$name.log"
+        if [ "$status" -eq 0 ] && ! grep -q "^Stopped (" "$logfile" 2>/dev/null; then
+            echo "teagarden-dev-attach: dev serve nbd did not finalize cleanly (its writes are safe in the local staging log; attach again once Telegram is reachable):" >&2
+            tail -5 "$logfile" >&2 2>/dev/null || true
+            status=1
+        fi
+    fi
+    rm -f "$link" "$pidfile" "$devfile"
+    echo "teagarden-dev '$name' detached."
+    exit "$status"
+fi
+
+# ── preflight ─────────────────────────────────────────────────────────────────
+command -v nbd-client >/dev/null 2>&1 || die "nbd-client not found (Debian/Ubuntu: nbd-client, Arch: nbd)"
+command -v "$TeaGarden" >/dev/null 2>&1 || die "$TeaGarden not found on PATH (set TEAGARDEN_BIN)"
+[ -e /dev/nbd0 ] || modprobe nbd >/dev/null 2>&1 || die "the 'nbd' kernel module is not loaded (sudo modprobe nbd)"
+[ ! -e "$link" ] || die "'$name' already attached at $link (use --detach first)"
+
+# A free NBD device is one with size 0.
+nbddev=""
+for d in /dev/nbd*; do
+    case "$d" in *p[0-9]*) continue ;; esac      # skip partitions
+    n="$(basename "$d")"
+    sz="$(cat "/sys/class/block/$n/size" 2>/dev/null || echo 0)"
+    if [ "$sz" = "0" ]; then nbddev="$d"; break; fi
+done
+[ -n "$nbddev" ] || die "no free /dev/nbdN (raise the module's nbds_max, e.g. modprobe nbd nbds_max=16)"
+
+# A free TCP port on loopback.
+port="$(python3 -c 'import socket;s=socket.socket();s.bind(("127.0.0.1",0));print(s.getsockname()[1]);s.close()' 2>/dev/null)"
+[ -n "$port" ] || die "could not allocate a local port"
+
+# ── serve ─────────────────────────────────────────────────────────────────────
+serve_args=(dev serve nbd "$name" --bind "$BIND_HOST:$port")
+[ -n "$password_file" ] && serve_args+=(--password-file "$password_file")
+
+logfile="$RUNDIR/$name.log"
+"$TeaGarden" "${serve_args[@]}" >"$logfile" 2>&1 &
+serve_pid=$!
+echo "$serve_pid" > "$pidfile"
+
+cleanup_failed_start() {
+    kill -INT "$serve_pid" 2>/dev/null || true
+    rm -f "$pidfile"
+    echo "--- serve log ---" >&2
+    tail -20 "$logfile" >&2 || true
+}
+
+# Wait for the server to bind. Argon2id runs first, so allow generous time.
+ready=0
+for _ in $(seq 1 300); do
+    if grep -q "^LISTENING " "$logfile" 2>/dev/null; then ready=1; break; fi
+    if ! kill -0 "$serve_pid" 2>/dev/null; then
+        cleanup_failed_start
+        die "serve exited before binding (wrong credential? device not created?)"
+    fi
+    sleep 0.5
+done
+[ "$ready" -eq 1 ] || { cleanup_failed_start; die "timed out waiting for the NBD server to bind"; }
+
+# ── attach ────────────────────────────────────────────────────────────────────
+# -b 4096: the engine's logical block size. Attaching with the default 512 makes
+# the kernel issue misaligned I/O and filesystems on top behave badly.
+if ! nbd-client -b 4096 "$BIND_HOST" "$port" "$nbddev" >/dev/null 2>&1; then
+    cleanup_failed_start
+    die "nbd-client failed to attach $nbddev"
+fi
+echo "$nbddev" > "$devfile"
+ln -sfn "$nbddev" "$link"
+
+echo "teagarden-dev '$name' attached."
+echo "  device : $link -> $nbddev"
+echo
+echo "Put a filesystem on it (this is the GUEST filesystem — teagarden-dev is the disk):"
+echo "  mkfs.ext4 $link"
+echo "  mount $link /mnt/$name"
+echo
+echo "Detach (umount first):"
+echo "  teagarden-dev-attach --detach $name"

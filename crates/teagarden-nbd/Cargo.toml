@@ -1,0 +1,26 @@
+[package]
+name = "teagarden-nbd"
+description = "NBD (Network Block Device) server for TeaGarden — serve an encrypted volume as a Linux block device (newstyle handshake, READ/WRITE/FLUSH/TRIM)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+readme = "../../README.md"
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+tracing = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+teagarden-blockdev = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+libc = { workspace = true }
+teagarden-blockdev = { workspace = true, features = ["test-util"] }
+# full-stack e2e: NBD -> BlockDeviceAdapter -> TeaGarden block-device engine -> mock transport
+teagarden-dev = { workspace = true, features = ["fault-injection"] }
+teagarden-core = { workspace = true }
+teagarden-telegram = { workspace = true, features = ["test-util"] }

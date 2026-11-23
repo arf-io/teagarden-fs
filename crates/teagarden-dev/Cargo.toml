@@ -1,0 +1,41 @@
+[package]
+name = "teagarden-dev"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+readme = "../../README.md"
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Encrypted, position-addressed, log-structured block device backed by Telegram (LUKS-like); the storage engine exported over NBD"
+
+[dependencies]
+# Crypto comes from teagarden-core for now (D3 default: depend-on-core, no
+# 34-file extraction). Transport + the shared block seam are lower-tier peers.
+teagarden-core = { workspace = true }
+teagarden-telegram = { workspace = true }
+teagarden-blockdev = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+uuid = { version = "1", features = ["v4"] }
+blake3 = { workspace = true }
+rand = { workspace = true }
+
+[features]
+# TEST-ONLY fault hooks (injected fsync failures) for dependents' integration
+# tests, e.g. teagarden-nbd's NBD error-propagation test. Never enable in a
+# product build: it adds methods that make a device fail on purpose.
+fault-injection = []
+
+[target.'cfg(unix)'.dependencies]
+# flock: the single-writer device-directory guard (dirlock.rs).
+libc = { workspace = true }
+
+[dev-dependencies]
+teagarden-blockdev = { workspace = true, features = ["test-util"] }
+teagarden-telegram = { workspace = true, features = ["test-util"] }
+tempfile = { workspace = true }
+# RLIMIT_FSIZE in child-process tests (real short writes / EFBIG).
+libc = { workspace = true }

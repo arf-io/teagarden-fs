@@ -1,0 +1,26 @@
+[package]
+name = "teagarden-api"
+description = "Service layer (volumes, sessions, auth, sharing, status) behind the TeaGarden CLI"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "../../README.md"
+
+[dependencies]
+teagarden-core = { workspace = true }
+teagarden-store = { workspace = true }
+teagarden-telegram = { workspace = true }
+teagarden-sharing = { workspace = true }
+rusqlite = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

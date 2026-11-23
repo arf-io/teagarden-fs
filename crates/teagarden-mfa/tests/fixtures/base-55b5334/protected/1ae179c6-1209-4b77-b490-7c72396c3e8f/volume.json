@@ -1,0 +1,73 @@
+{
+  "volume_id": "1ae179c6-1209-4b77-b490-7c72396c3e8f",
+  "display_name": "protected-fixture",
+  "group_name": "horizon weaves warmly",
+  "telegram_group_id": 0,
+  "telegram_channel_access_hash": 0,
+  "telegram_topic_id": 0,
+  "metadata_snapshot_id": null,
+  "current_epoch": 0,
+  "salt": [
+    156,
+    1,
+    127,
+    199,
+    162,
+    119,
+    97,
+    80,
+    53,
+    240,
+    221,
+    239,
+    232,
+    139,
+    125,
+    198,
+    88,
+    69,
+    188,
+    233,
+    253,
+    5,
+    132,
+    215,
+    159,
+    88,
+    158,
+    222,
+    245,
+    217,
+    74,
+    36
+  ],
+  "kdf_params": {
+    "memory_kib": 262144,
+    "iterations": 4,
+    "parallelism": 4,
+    "output_len": 32
+  },
+  "block_config": {
+    "min_block_size": 4096,
+    "max_block_size": 52428800,
+    "target_block_size": 47185920,
+    "compression": "Lz4"
+  },
+  "default_policy_id": 0,
+  "cache_config": {
+    "enabled": true,
+    "max_size": 1073741824,
+    "metadata_cache": true,
+    "prefetch_depth": 4
+  },
+  "created_at": 1794695402,
+  "password_verification_hash": "328a34049e18c25c59f820f5ec9907109badd11c68a1d98bd9911100c476a03f",
+  "config_integrity": "16837ac20260254176ea374a0a17fca0c7592a9bd1d789b35d06ce1c2fd78f6c",
+  "volume_version": 1,
+  "require_block_integrity": true,
+  "block_v2_from_epoch": 0,
+  "key_protection": {
+    "vault_generation": 3,
+    "vault_digest": "9457667f94ae20037bd60ede9bde6d9d0aa21fbceff0df2c86c598f5590129cb"
+  }
+}

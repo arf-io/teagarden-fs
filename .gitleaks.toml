@@ -1,0 +1,58 @@
+title = "teagarden secret-scanning policy"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Unit-test passwords are fixed non-production test vectors."
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''(^|/)crates/teagarden-mfa/src/factors/password\.rs$''']
+regexTarget = "match"
+regexes = ['''password[12]''']
+
+[[allowlists]]
+description = "Telegram setup documentation uses the canonical sequential-hex placeholder."
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = [
+  '''(^|/)docs/TELEGRAM_SETUP\.md$''',
+  '''(^|/)scripts/setup-telegram\.sh$''',
+]
+regexTarget = "match"
+regexes = ['''0123456789abcdef0123456789abcdef''']
+
+[[allowlists]]
+description = "HTTP API examples use visibly non-secret bearer placeholders."
+condition = "AND"
+targetRules = ["curl-auth-header"]
+paths = ['''(^|/)docs/HTTP_API\.md$''']
+regexTarget = "match"
+regexes = [
+  '''Bearer a3f8c2d1e4b5\.\.\.''',
+  '''Bearer admin-password''',
+]
+
+[[allowlists]]
+description = "The auth and configuration tests use explicit sequential Telegram API hashes."
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''(^|/)crates/teagarden-cli/(src/commands/(auth|configure)\.rs|tests/cli_integration\.rs)$''']
+regexTarget = "secret"
+regexes = ["^0123456789abcdef0123456789abcdef$", "^fedcba9876543210fedcba9876543210$"]
+
+[[allowlists]]
+description = "The bot configuration unit test uses a deliberately synthetic token with an equals sign."
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''(^|/)crates/teagarden-cli/src/commands/bot_env\.rs$''']
+regexTarget = "secret"
+regexes = ["^123:AAtestsecret=equals_0123456789abcdefgh$", "^equals_0123456789abcdefgh$"]
+
+[[allowlists]]
+description = "The fixed legacy test volume carries a publicly generated password verifier."
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''(^|/)crates/teagarden\-mfa/tests/fixtures/base\-55b5334/protected/1ae179c6\-1209\-4b77\-b490\-7c72396c3e8f/volume\.json$''']
+regexTarget = "secret"
+regexes = ["^328a34049e18c25c59f820f5ec9907109badd11c68a1d98bd9911100c476a03f$"]

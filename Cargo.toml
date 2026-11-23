@@ -1,0 +1,117 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/teagarden-core",
+    "crates/teagarden-store",
+    "crates/teagarden-blockdev",
+    "crates/teagarden-dev",
+    "crates/teagarden-telegram",
+    "crates/teagarden-cache",
+    "crates/teagarden-fuse",
+    "crates/teagarden-sharing",
+    "crates/teagarden-api",
+    "crates/teagarden-cli",
+    "crates/teagarden-mfa",
+    "crates/teagarden-nbd",
+    "crates/teagarden-transport-test",
+]
+
+[workspace.package]
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.89"
+license = "MIT"
+repository = "https://github.com/arf-io/teagarden-fs"
+keywords = ["encryption", "filesystem", "telegram", "fuse", "post-quantum"]
+categories = ["cryptography", "filesystem"]
+
+[workspace.dependencies]
+# Internal crates
+teagarden-core = { path = "crates/teagarden-core", version = "1.0.0" }
+teagarden-store = { path = "crates/teagarden-store", version = "1.0.0" }
+teagarden-blockdev = { path = "crates/teagarden-blockdev", version = "1.0.0" }
+teagarden-dev = { path = "crates/teagarden-dev", version = "1.0.0" }
+teagarden-telegram = { path = "crates/teagarden-telegram", version = "1.0.0" }
+teagarden-cache = { path = "crates/teagarden-cache", version = "1.0.0" }
+teagarden-fuse = { path = "crates/teagarden-fuse", version = "1.0.0" }
+teagarden-sharing = { path = "crates/teagarden-sharing", version = "1.0.0" }
+teagarden-api = { path = "crates/teagarden-api", version = "1.0.0" }
+teagarden-mfa = { path = "crates/teagarden-mfa", version = "1.0.0" }
+teagarden-nbd = { path = "crates/teagarden-nbd", version = "1.0.0" }
+
+futures = "0.3"
+fs2 = "0.4"
+
+# Crypto
+chacha20poly1305 = "0.10"
+totp-rs = { version = "5", features = ["gen_secret", "steam"] }
+blake3 = "1"
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+hkdf = "0.12"
+hmac = "0.12"
+sha2 = "0.10"
+ring = "0.17"
+argon2 = "0.5"
+ml-kem = { version = "0.3.2", features = ["getrandom", "zeroize"] }
+rand = "0.8"
+zeroize = { version = "1", features = ["derive"] }
+subtle = "2"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+postcard = { version = "1", default-features = false, features = ["alloc", "use-std"] }
+
+# Storage
+rusqlite = { version = "0.41", features = ["bundled", "blob", "session"] }
+
+# Telegram
+grammers-client = "0.10"
+grammers-session = { version = "0.10", default-features = false }
+# Note: grammers-tl-types is pinned directly in teagarden-telegram to "0.10" to
+# match what grammers-client 0.10 uses internally; no workspace-level pin needed.
+
+# Async
+tokio = { version = "1", features = ["full"] }
+
+# Compression
+lz4_flex = "0.11"
+zstd = "0.13"
+
+# FUSE
+fuser = { version = "0.16", default-features = false }
+
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+clap_complete = "4"
+clap_mangen = "0.2"
+toml = "1"
+
+# Utilities
+uuid = { version = "1", features = ["v4", "serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+thiserror = "1"
+anyhow = "1"
+tempfile = "3"
+dirs = "5"
+hex = "0.4"
+base32 = "0.5"
+base64ct = { version = "1", features = ["alloc"] }
+async-trait = "0.1"
+libc = "0.2"
+rpassword = "7"
+
+# Testing
+proptest = "1"
+assert_cmd = "2"
+predicates = "3"
+
+# Test-speed only: optimise every dependency (argon2, blake3, chacha20poly1305, ...)
+# and the crypto core in dev/test builds so Argon2 (256 MiB, t=4) does not take
+# minutes per derivation under `cargo test`. Release builds are unaffected.
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.dev.package.teagarden-core]
+opt-level = 3

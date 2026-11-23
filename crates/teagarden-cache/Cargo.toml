@@ -1,0 +1,21 @@
+[package]
+name = "teagarden-cache"
+description = "Local encrypted block and metadata cache"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "../../README.md"
+
+[dependencies]
+teagarden-core = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+hex = { workspace = true }
+dirs = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

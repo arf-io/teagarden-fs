@@ -1,0 +1,59 @@
+{
+  "version": 2,
+  "vault_uuid_hex": "5e2c056757c049029b66efc72cd19c3a",
+  "subject_id": "teagarden-volume",
+  "mk_commitment_hex": "1d1e428bef4fe557b6441c177cff0323abb48e606e06cfda74b59f2fb581d953",
+  "policy_mac_hex": "a46be20db486117d863a731e1b802d76dae48b89db641a061539ebae28f09c45",
+  "next_slot_id": 2,
+  "next_share_gen": 1,
+  "vault_generation": 3,
+  "policy": {
+    "entries": [
+      {
+        "kind": "slot",
+        "slot_id": 0
+      },
+      {
+        "kind": "slot",
+        "slot_id": 1
+      }
+    ]
+  },
+  "slots": [
+    {
+      "slot_id": 0,
+      "slot_type": "passphrase",
+      "label": "passphrase",
+      "enabled": true,
+      "params": {
+        "argon2": {
+          "m_kib": 65536,
+          "p": 1,
+          "t": 2
+        },
+        "salt_b64": "3CjEgZpuo/oiG4mlFeA7Jw=="
+      },
+      "kek_transport": {
+        "kind": "derived"
+      },
+      "payload_is_share": false,
+      "share_gen": 0,
+      "payload_ct_b64": "Sj5cCQ/d1yrvEG4koLgmgiFtnCgyhKdE7DIcf01SjX4SAZYn23Y0cJ0xlhoVLdYuyKyR5M8AQakTfjGVBS40ftgzL0O25L4l"
+    },
+    {
+      "slot_id": 1,
+      "slot_type": "recovery",
+      "label": "recovery",
+      "enabled": true,
+      "params": {
+        "wordlist_version": 1
+      },
+      "kek_transport": {
+        "kind": "derived"
+      },
+      "payload_is_share": false,
+      "share_gen": 0,
+      "payload_ct_b64": "raNwY3Afd5Ti2EZwhJ1ugRP0y7TXJyvEOGYb1+3IZv88/spKb15Xl3NR1QmtNofAfOeP34ZZza/TflExeUUpErCWmWGB8c2r"
+    }
+  ]
+}

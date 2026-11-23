@@ -1,0 +1,80 @@
+# teagarden-dev@.service — attach a TeaGarden encrypted block device at boot.
+#
+# This is the crypttab-shaped half of the integration: it brings the device up as
+# /dev/teagarden-dev/<name> so an /etc/fstab entry for the GUEST filesystem can then
+# mount it, in the right order.
+#
+# INSTALL
+#   sudo install -m 644 system/teagarden-dev@.service /etc/systemd/system/
+#   sudo install -m 755 scripts/teagarden-dev-attach  /usr/local/sbin/
+#   sudo systemctl daemon-reload
+#
+# USE  (the part after @ is the device name from `teagarden dev create`)
+#   sudo systemctl enable --now teagarden-dev@vault
+#
+# CREDENTIAL
+#   A boot-time attach cannot prompt, so the credential must come from a file.
+#   Create it 0600 and root-owned:
+#       printf '%s' 'your-device-credential' | sudo tee /etc/teagarden-dev/vault.pw >/dev/null
+#       sudo chmod 600 /etc/teagarden-dev/vault.pw
+#
+# MOUNTING THE GUEST FILESYSTEM
+#   Add an fstab entry that requires this unit, so it cannot race the attach:
+#
+#     /dev/teagarden-dev/vault  /mnt/vault  ext4  _netdev,nofail,x-systemd.requires=teagarden-dev@vault.service  0 0
+#
+#   `_netdev` is what places the mount in remote-fs.target, which is why this
+#   unit orders itself Before=remote-fs-pre.target rather than local-fs.target.
+#
+#   `_netdev` because the device is backed by Telegram and needs the network.
+#   `nofail` so a transient network problem does not drop the machine into
+#   emergency mode.
+
+[Unit]
+Description=TeaGarden encrypted block device (%i)
+Documentation=https://github.com/arf-io/teagarden-fs
+# Telegram-backed: the network must be genuinely up, not merely configured.
+After=network-online.target
+Wants=network-online.target
+# NOT Before=local-fs.target — that creates a real ordering cycle, because
+# network-online.target transitively depends on local-fs.target, and systemd
+# breaks such cycles by deleting jobs non-deterministically (confirmed with
+# `systemd-analyze verify`). A network-backed block device belongs to the
+# remote-fs ordering, which is exactly what an `_netdev` fstab entry uses.
+Before=remote-fs-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+# Key derivation is Argon2id at 256 MiB; the engine then has to reach Telegram
+# and read its head. Give it room rather than failing a slow-network boot.
+TimeoutStartSec=300
+
+Environment=TEAGARDEN_BIN=/usr/local/bin/teagarden
+ExecStart=/usr/local/sbin/teagarden-dev-attach --password-file /etc/teagarden-dev/%i.pw %i
+ExecStop=/usr/local/sbin/teagarden-dev-attach --detach %i
+# On stop, `dev serve nbd` uploads the open segment (up to 45 MiB by default) and
+# publishes a final checkpoint before it exits. systemd SIGKILLs what is left of
+# the unit after TimeoutStopSec, which would cut that upload short (the data
+# stays in the local staging log, but Telegram would lag). The detach script
+# waits up to 840 s; leave a margin above it.
+TimeoutStopSec=900
+
+# The credential file is root-only and the attach needs /dev + kernel modules,
+# so this runs as root. Everything not needed is dropped.
+User=root
+NoNewPrivileges=yes
+ProtectHome=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+# NOT ProtectSystem=strict and NOT PrivateDevices: this unit's entire job is to
+# create a device node in /dev and load the nbd module.
+ReadWritePaths=/dev /run
+
+[Install]
+WantedBy=multi-user.target

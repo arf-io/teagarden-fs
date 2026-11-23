@@ -1,0 +1,68 @@
+#!/bin/sh
+# mount.teagarden — mount(8) / fstab helper so a TeaGarden volume mounts like a
+# real filesystem. With this installed at /sbin/mount.teagarden:
+#
+#   mount -t TeaGarden <volume> <dir> -o password_file=/p[,allow_other]
+#
+# works, and so do /etc/fstab entries + `mount -a` + boot:
+#
+#   <volume>  <dir>  TeaGarden  _netdev,password_file=/p[,allow_other]  0 0
+#
+# It translates mount options to the TeaGarden CLI and uses --daemonize (the binary
+# backgrounds itself once the mount is up and returns a real exit code, so `mount`
+# / systemd are not left blocked). A non-interactive password (password_file=) is
+# required — boot/fstab can't prompt. `_netdev` is recommended so the network is up
+# first (TeaGarden needs Telegram).
+#
+# Install: sudo install -m 755 scripts/mount.teagarden /sbin/mount.teagarden
+set -u
+TeaGarden="${TEAGARDEN_BIN:-teagarden}"
+vol="${1:?usage: mount.teagarden <volume> <mountpoint> [-o opts]}"
+dir="${2:?usage: mount.teagarden <volume> <mountpoint> [-o opts]}"
+shift 2
+
+opts=""
+fake=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -o) opts="$opts,$2"; shift 2 ;;
+    -o*) opts="$opts,${1#-o}"; shift ;;
+    # mount(8) -f means "fake mount": go through the motions but do NOT mount.
+    # Previously this was ignored and a REAL mount was performed, which is the
+    # opposite of what the caller asked for.
+    -f) fake=1; shift ;;
+    *) shift ;;            # -s/-n/-v are genuinely irrelevant to us
+  esac
+done
+
+pw=""; extra=""
+oldifs=$IFS; IFS=','
+for o in $opts; do
+  case "$o" in
+    password_file=*) pw="${o#password_file=}" ;;
+    allow_other)     extra="$extra --allow-other" ;;
+    # `ro` is REFUSED, not ignored. TeaGarden has no read-only mount mode, and
+    # silently mounting read-WRITE when the caller (or an /etc/fstab line) asked
+    # for read-only is a data-integrity hazard: the user believes the filesystem
+    # cannot be modified. Fail loudly instead of quietly doing the opposite.
+    ro) echo "mount.teagarden: -o ro is not supported — teagarden has no read-only mount mode, and mounting read-write when you asked for read-only would be worse than failing. Remove 'ro' to mount read-write." >&2
+        exit 32 ;;
+    ""|rw|noauto|nofail|defaults|_netdev|auto|user|users|nouser|owner|group|comment=*|x-systemd.*) : ;;
+    *) : ;;              # ignore other/unknown mount opts
+  esac
+done
+IFS=$oldifs
+
+if [ -z "$pw" ]; then
+  echo "mount.teagarden: -o password_file=/path/to/secret is required (mode 0600); a boot/fstab mount can't prompt" >&2
+  exit 32
+fi
+
+if [ "$fake" -eq 1 ]; then
+  # -f: report that the options are acceptable, without mounting.
+  echo "mount.teagarden: fake mount (-f) — options OK for '$vol' at '$dir'; not mounting."
+  exit 0
+fi
+
+# shellcheck disable=SC2086  # $extra is a deliberately word-split flag list
+exec "$TeaGarden" volume mount --daemonize --password-file "$pw" $extra "$vol" "$dir"

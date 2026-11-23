@@ -1,0 +1,40 @@
+[package]
+name = "teagarden-core"
+description = "Core cryptography, block, metadata, and policy library for TeaGarden"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "../../README.md"
+
+[features]
+key-rotation = []
+
+[dependencies]
+chacha20poly1305 = { workspace = true }
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+hkdf = { workspace = true }
+sha2 = { workspace = true }
+ring = { workspace = true }
+argon2 = { workspace = true }
+ml-kem = { workspace = true }
+rand = { workspace = true }
+zeroize = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+lz4_flex = { workspace = true }
+zstd = { workspace = true }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+hex = { workspace = true }
+dirs = { workspace = true }
+fs2 = { workspace = true }
+libc = { workspace = true }
+
+[dev-dependencies]
+proptest = { workspace = true }
+tempfile = { workspace = true }

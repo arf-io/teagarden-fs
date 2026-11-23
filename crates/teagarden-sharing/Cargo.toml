@@ -1,0 +1,30 @@
+[package]
+name = "teagarden-sharing"
+description = "ML-KEM-encrypted volume grants and local sharing records for TeaGarden"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "../../README.md"
+
+[dependencies]
+teagarden-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+base64ct = { workspace = true }
+postcard = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+blake3 = { workspace = true }
+hmac = { workspace = true }
+sha2 = { workspace = true }
+subtle = { workspace = true }
+zeroize = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+serde_json = { workspace = true }
+teagarden-mfa = { workspace = true }

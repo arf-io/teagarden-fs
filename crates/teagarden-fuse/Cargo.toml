@@ -1,0 +1,47 @@
+[package]
+name = "teagarden-fuse"
+description = "FUSE filesystem layer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "../../README.md"
+
+[features]
+key-rotation = ["teagarden-core/key-rotation"]
+
+[dependencies]
+teagarden-core = { workspace = true }
+teagarden-store = { workspace = true }
+teagarden-cache = { workspace = true }
+teagarden-telegram = { workspace = true }
+fuser = { workspace = true }
+rusqlite = { workspace = true }
+tokio = { workspace = true }
+futures = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+libc = { workspace = true }
+tracing = { workspace = true }
+zeroize = { workspace = true }
+blake3 = { workspace = true }
+hex = { workspace = true }
+sha2 = { workspace = true }
+ring = { workspace = true }
+rand = { workspace = true }
+uuid = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+teagarden-telegram = { workspace = true, features = ["test-util"] }
+# K0b real-mount e2e: drive CryptFs keys from a factor-unlocked MK-rooted hierarchy.
+teagarden-mfa = { workspace = true }
+
+# macOS/BSD: fuser's pure-Rust mount is Linux-only (its build.rs panics otherwise);
+# enable the `libfuse` feature so it links libfuse / macFUSE via pkg-config.
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+fuser = { workspace = true, features = ["libfuse"] }

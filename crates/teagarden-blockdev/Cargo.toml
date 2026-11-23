@@ -1,0 +1,18 @@
+[package]
+name = "teagarden-blockdev"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+readme = "../../README.md"
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Shared synchronous block-device trait for TeaGarden (NBD front-end, teagarden-dev back-end)"
+
+[features]
+# In-memory MemBlockDevice test double. Kept OFF the default build; enable it in
+# dev-dependencies / tests that need it.
+test-util = []
+
+[dependencies]

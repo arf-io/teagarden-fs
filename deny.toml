@@ -1,0 +1,84 @@
+# cargo-deny configuration (schema: cargo-deny 0.19+).
+# Vulnerabilities are always errors in current cargo-deny (no longer a config key).
+
+[advisories]
+# Flag unmaintained crates anywhere in the graph and treat yanked crates as errors.
+unmaintained = "all"
+yanked = "deny"
+# Accepted residuals. Each is transitive (we don't depend on it directly and cannot
+# bump it without the upstream crate changing). The impactful ones were FIXED, not
+# ignored: fuser was upgraded 0.14 -> 0.16 (closes RUSTSEC-2021-0154, an unsound
+# read in the mount path) and lz4_flex 0.11.5 -> 0.11.6 (closes RUSTSEC-2026-0041,
+# a decompression info leak). An ignore that stops matching anything must be
+# removed (`cargo deny check` warns `advisory-not-detected`).
+ignore = [
+    # This is an unmaintained-crate notice with no reported vulnerability.
+    # grammers-client 0.10 still requires chrono for its timestamp API.
+    # Remove the exception after testing a grammers upgrade against Telegram.
+    { id = "RUSTSEC-2026-0543", reason = "chrono is a transitive dependency of grammers-client 0.10; this advisory is informational; remove after the next live-tested grammers upgrade" },
+    # paste is an unmaintained proc-macro helper used ubiquitously across the ecosystem.
+    { id = "RUSTSEC-2024-0436", reason = "paste unmaintained; transitive proc-macro helper, no maintained drop-in" },
+    # proc-macro-error2 is a BUILD-TIME proc-macro helper reached via
+    # i18n-embed-fl <- age. age 0.12 removes it, but currently cannot coexist
+    # with this workspace's stable ml-kem 0.3: age unconditionally selects
+    # ml-kem 0.2, which pins the incompatible kem 0.3.0-pre.0 API. Revisit when
+    # age moves its native PQ recipient to ml-kem 0.3. No code from this helper
+    # ships in the TeaGarden binary.
+    { id = "RUSTSEC-2026-0173", reason = "proc-macro-error2 is an unmaintained build-time-only transitive via age 0.11; age 0.12 conflicts with required stable ml-kem 0.3 because its ml-kem 0.2 pins kem 0.3.0-pre.0; no helper code ships in the binary" },
+
+    # basic-toml is unmaintained (archived upstream, last release March 2025): an
+    # unmaintained-crate notice, not a vulnerability. It arrives through age's i18n
+    # support (`cargo tree -i basic-toml`): age -> i18n-embed-fl -> i18n-config ->
+    # basic-toml, and age -> i18n-embed -> i18n-embed-impl -> i18n-config ->
+    # basic-toml. There is no maintained drop-in for it; the advisory suggests
+    # `toml`, a different API that i18n-config would have to adopt. age 0.12 still
+    # depends on i18n-embed and i18n-embed-fl (crates.io metadata), and cannot be
+    # adopted yet anyway (see the proc-macro-error2 entry above). Revisit when age
+    # or i18n-config moves off basic-toml.
+    { id = "RUSTSEC-2026-0374", reason = "basic-toml unmaintained (not a vulnerability); transitive via age's i18n support (i18n-embed-fl, i18n-embed-impl -> i18n-config); no maintained drop-in" },
+
+    # rsa (Marvin timing sidechannel), reached only via age's ssh feature. There is
+    # no fixed release of `rsa`, so this cannot be resolved by upgrading.
+    #
+    # ACTIVELY MITIGATED IN-TREE, not merely tolerated: the keypair protector
+    # REFUSES ssh-rsa recipients at enrollment
+    # (kslot/protectors/keypair.rs:81-84, which cites this advisory by ID), so no
+    # TeaGarden key slot can be encrypted to an RSA recipient. Enforced by the
+    # regression test `ssh_rsa_recipients_are_rejected`. `for_unlock_age` is
+    # X25519-only.
+    #
+    # HONEST RESIDUAL: `for_unlock_ssh` calls `age::ssh::Identity::from_buffer`,
+    # which would accept an RSA private key. Reaching the RSA code path therefore
+    # requires a hand-crafted vault containing a stanza encrypted to an ssh-rsa
+    # recipient (which this software will not produce) AND the victim unlocking it
+    # with an RSA key. Marvin additionally needs many timed decryption oracle
+    # queries; a local interactive unlock is not such an oracle.
+    { id = "RUSTSEC-2023-0071", reason = "rsa Marvin timing sidechannel via age/ssh; no fixed release exists. Mitigated in-tree: ssh-rsa recipients are refused at enrollment (keypair.rs:81-84, test ssh_rsa_recipients_are_rejected), so no slot is RSA-encrypted. Residual documented in deny.toml." },
+]
+
+[licenses]
+# Allow-list of acceptable licenses; anything else is denied.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "0BSD",
+    "ISC",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+    "CC0-1.0",
+    "OpenSSL",
+    "BSL-1.0",
+    "MPL-2.0",
+    "CDLA-Permissive-2.0",
+]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

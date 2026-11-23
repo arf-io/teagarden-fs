@@ -1,0 +1,118 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  CARGO_PROFILE_DEV_DEBUG: "0"
+  CARGO_PROFILE_TEST_DEBUG: "0"
+  RUSTFLAGS: "-D warnings"
+
+jobs:
+  linux:
+    name: Linux (${{ matrix.features }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        features: [default, key-rotation]
+    steps:
+      - uses: actions/checkout@v4
+      - name: System packages
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends \
+            build-essential libclang-dev pkg-config fuse3 \
+            swtpm swtpm-tools tpm2-tools softhsm2 opensc tang jose clevis socat
+          test -c /dev/fuse || sudo modprobe fuse
+          test -c /dev/fuse
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal -c clippy,rustfmt
+          rustup default stable
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Clippy and tests with real FUSE, software TPM, SoftHSM and Tang
+        env:
+          FEATURE_SET: ${{ matrix.features }}
+          TEAGARDEN_REQUIRE_FUSE: "1"
+          TEAGARDEN_REQUIRE_TPM: "1"
+          TEAGARDEN_REQUIRE_HSM: "1"
+          TEAGARDEN_REQUIRE_TANG: "1"
+        run: |
+          export PATH="$PATH:/usr/libexec"
+          features=()
+          if [[ "$FEATURE_SET" == key-rotation ]]; then
+            features+=(--features key-rotation)
+          fi
+          cargo clippy --workspace --all-targets --locked "${features[@]}" -- -D warnings
+          cargo test --workspace --all-targets --locked --no-fail-fast "${features[@]}"
+          cargo test --workspace --doc --locked "${features[@]}"
+      - name: CLI help snapshot is current
+        if: matrix.features == 'default'
+        run: bash scripts/check-docs-help.sh
+      - name: No unclassified stubs
+        if: matrix.features == 'default'
+        run: |
+          sudo apt-get install -y -qq ripgrep
+          bash scripts/check-stubs.sh
+
+  macos:
+    name: macOS (build and tests that need no FUSE mount)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install stable --profile minimal -c clippy
+          rustup default stable
+      - name: macFUSE headers and pkg-config
+        run: |
+          brew install pkg-config
+          brew install --cask macfuse
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - name: Tests
+        run: cargo test --workspace --all-targets --locked --no-fail-fast
+
+  install-script:
+    name: scripts/install.sh on a fresh Ubuntu runner
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install, verify, and package the release binary
+        run: |
+          prefix="$RUNNER_TEMP/teagarden-install"
+          version="$(sed -n 's/^version = "\([^"]*\)"$/\1/p' Cargo.toml)"
+          test -n "$version"
+          scripts/install.sh --deps --yes --prefix "$prefix"
+          test "$("$prefix/bin/teagarden" --version)" = "teagarden $version"
+          bundle="teagarden-$version-linux-x86_64"
+          install -Dm755 "$prefix/bin/teagarden" "$RUNNER_TEMP/$bundle/teagarden"
+          install -m644 LICENSE "$RUNNER_TEMP/$bundle/LICENSE"
+          mkdir dist
+          tar -C "$RUNNER_TEMP" -czf "dist/$bundle.tar.gz" "$bundle"
+          (cd dist && sha256sum "$bundle.tar.gz" > "$bundle.tar.gz.sha256")
+          scripts/uninstall.sh --prefix "$prefix"
+          test ! -e "$prefix/bin/teagarden"
+      - name: Upload the verified Linux x86_64 build
+        uses: actions/upload-artifact@v4
+        with:
+          name: teagarden-linux-x86_64
+          path: dist/*
+          if-no-files-found: error
+
+  dependencies:
+    name: Dependency advisories and licenses
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2

@@ -1,0 +1,87 @@
+[package]
+name = "teagarden-mfa"
+description = "Multi-factor key derivation for TeaGarden volume protection"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "../../README.md"
+
+[features]
+# Software factor injection for command-path tests; never enabled by product defaults.
+test-util = []
+key-rotation = ["teagarden-core/key-rotation"]
+# All device factors ship in a default build (operator directive 2026-07-27):
+# every factor built into the product must be reachable from a stock install.
+default = ["tpm2", "factor-fido2", "factor-pkcs11"]
+tpm2 = []
+# K1: real FIDO2 hmac-secret slots via a physical authenticator. The shipped
+# protector delegates to the external `age-plugin-fido2-hmac` binary (libfido2)
+# at runtime. It has no native build dependency. ON by default.
+factor-fido2 = []
+# Development-only direct CTAP diagnostic. This is deliberately separate from
+# the shipped factor so a normal build does not compile or imply a second FIDO2
+# implementation.
+fido2-ctap-diagnostics = ["factor-fido2", "dep:ctap-hid-fido2"]
+# K3: real PKCS#11 / HSM slots (RSA-OAEP KEK wrap) via the cryptoki bindings.
+# ON by default; the module is dlopen'd at runtime, so this adds no build-time
+# system dependency.
+factor-pkcs11 = ["dep:cryptoki"]
+
+[dependencies]
+teagarden-core = { workspace = true }
+blake3 = { workspace = true }
+argon2 = { workspace = true }
+chacha20poly1305 = { workspace = true }
+sha2 = { workspace = true }
+rand = { workspace = true }
+zeroize = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+base64ct = { workspace = true }
+base32 = { workspace = true }
+totp-rs = { workspace = true }
+hex = { workspace = true }
+# termios, for reading the authenticator PIN from /dev/tty with echo disabled.
+nix = { version = "0.29", features = ["term"] }
+# `plugin` enables age plugin identities — used by the FIDO2 protector, which
+# delegates to age-plugin-fido2-hmac (libfido2) rather than speaking CTAP
+# directly. See kslot/protectors/fido2.rs for why.
+age = { version = "0.11.5", default-features = false, features = ["ssh", "plugin"] }
+subtle.workspace = true
+uuid = { workspace = true, features = ["v4"] }
+# Shamir threshold sharing over GF(256).
+#
+# NOT `sharks`: that crate carries RUSTSEC-2024-0398 (Cure53) — its dealer drew
+# polynomial coefficients from [1,255] instead of [0,255], so knowing a
+# coefficient cannot be zero lets an attacker exclude byte values for the secret
+# given one share fewer than the threshold. The advisory states "No safe upgrade
+# is available" and the crate has been unpublished-since 2021-03-14.
+#
+# vsss-rs `Gf256` produces the identical canonical wire format (1-byte
+# x-coordinate ‖ 32 y-bytes), verified cross-compatible in both directions, so
+# this is a security fix and not a format change.
+vsss-rs = { version = "6", default-features = false, features = ["std", "zeroize"] }
+# vsss-rs 6 uses rand_core 0.10; the OS CSPRNG adapter for that trait version.
+rand_core_v010 = { package = "rand_core", version = "0.10" }
+getrandom_v04 = { package = "getrandom", version = "0.4", features = ["sys_rng"] }
+# K2 TPM2 sealing protector: per-op scratch dir for tpm2-tools context/blob files.
+tempfile = { workspace = true }
+# Development-only direct CTAP2 diagnostic over hidraw.
+ctap-hid-fido2 = { version = "3.5.11", optional = true }
+cryptoki = { version = "0.10.0", optional = true }
+
+[dev-dependencies]
+rpassword = { workspace = true } # masked PIN entry in the k1_fido2_e2e example
+
+[package.metadata.docs.rs]
+no-default-features = true
+features = ["tpm2", "factor-fido2", "factor-pkcs11"]
+
+[[example]]
+name = "fido2_hmac_diag"
+required-features = ["fido2-ctap-diagnostics"]

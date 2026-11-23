@@ -1,0 +1,35 @@
+[package]
+name = "teagarden-transport-test"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "transport-test"
+path = "src/main.rs"
+
+[[bin]]
+name = "p1-feasibility"
+path = "src/bin/p1_feasibility.rs"
+
+[[bin]]
+name = "p3-device-e2e"
+path = "src/bin/p3_device_e2e.rs"
+
+[dependencies]
+teagarden-telegram = { workspace = true }
+teagarden-dev = { workspace = true }
+teagarden-core = { workspace = true }
+tempfile = { workspace = true }
+grammers-tl-types = "0.10"
+tokio = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+rand = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+jiff = "0.2"
